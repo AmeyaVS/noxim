@@ -14,6 +14,32 @@
 YAML::Node config;
 YAML::Node power_config;
 
+static char *requireOptionValue(int &index, int arg_num, char *arg_vet[], const char *option)
+{
+    if (index + 1 >= arg_num) {
+        cerr << "Error: Missing value for option " << option << endl;
+        exit(1);
+    }
+
+    return arg_vet[++index];
+}
+
+static string parseVerboseMode(const char *value)
+{
+    if (!strcmp(value, "0") || !strcmp(value, VERBOSE_OFF))
+        return VERBOSE_OFF;
+    if (!strcmp(value, "1") || !strcmp(value, VERBOSE_LOW))
+        return VERBOSE_LOW;
+    if (!strcmp(value, "2") || !strcmp(value, VERBOSE_MEDIUM))
+        return VERBOSE_MEDIUM;
+    if (!strcmp(value, "3") || !strcmp(value, VERBOSE_HIGH))
+        return VERBOSE_HIGH;
+
+    cerr << "Error: Invalid verbosity level: " << value << endl;
+    cerr << "Valid values are 0-3 or VERBOSE_OFF/VERBOSE_LOW/VERBOSE_MEDIUM/VERBOSE_HIGH" << endl;
+    exit(1);
+}
+
 void loadConfiguration() {
 
     cout << "Loading configuration from file \"" << GlobalParams::config_filename << "\"...";
@@ -463,37 +489,37 @@ void parseCmdLine(int arg_num, char *arg_vet[])
 	for (int i = 1; i < arg_num; i++) 
 	{
 	    if (!strcmp(arg_vet[i], "-verbose"))
-		GlobalParams::verbose_mode = atoi(arg_vet[++i]);
+		GlobalParams::verbose_mode = parseVerboseMode(requireOptionValue(i, arg_num, arg_vet, "-verbose"));
 	    else if (!strcmp(arg_vet[i], "-trace")) 
 	    {
 		GlobalParams::trace_mode = true;
-		GlobalParams::trace_filename = arg_vet[++i];
+		GlobalParams::trace_filename = requireOptionValue(i, arg_num, arg_vet, "-trace");
 	    } 
 	    else if (!strcmp(arg_vet[i], "-dimx"))
-		GlobalParams::mesh_dim_x = atoi(arg_vet[++i]);
+		GlobalParams::mesh_dim_x = atoi(requireOptionValue(i, arg_num, arg_vet, "-dimx"));
 	    else if (!strcmp(arg_vet[i], "-dimy"))
-		GlobalParams::mesh_dim_y = atoi(arg_vet[++i]);
+		GlobalParams::mesh_dim_y = atoi(requireOptionValue(i, arg_num, arg_vet, "-dimy"));
 
 	    else if (!strcmp(arg_vet[i], "-dtiles"))
-		GlobalParams::n_delta_tiles = atoi(arg_vet[++i]);
+		GlobalParams::n_delta_tiles = atoi(requireOptionValue(i, arg_num, arg_vet, "-dtiles"));
 
 	    else if (!strcmp(arg_vet[i], "-buffer"))
-		GlobalParams::buffer_depth = atoi(arg_vet[++i]);
+		GlobalParams::buffer_depth = atoi(requireOptionValue(i, arg_num, arg_vet, "-buffer"));
 	    else if (!strcmp(arg_vet[i], "-buffer_tt"))
-		setBufferToTile(atoi(arg_vet[++i]));
+		setBufferToTile(atoi(requireOptionValue(i, arg_num, arg_vet, "-buffer_tt")));
 	    else if (!strcmp(arg_vet[i], "-buffer_ft"))
-		setBufferFromTile(atoi(arg_vet[++i]));
+		setBufferFromTile(atoi(requireOptionValue(i, arg_num, arg_vet, "-buffer_ft")));
 	    else if (!strcmp(arg_vet[i], "-buffer_antenna"))
-		setBufferAntenna(atoi(arg_vet[++i]));
+		setBufferAntenna(atoi(requireOptionValue(i, arg_num, arg_vet, "-buffer_antenna")));
 	    else if (!strcmp(arg_vet[i], "-vc"))
-		GlobalParams::n_virtual_channels = (atoi(arg_vet[++i]));
+		GlobalParams::n_virtual_channels = atoi(requireOptionValue(i, arg_num, arg_vet, "-vc"));
 	    else if (!strcmp(arg_vet[i], "-flit"))
-		GlobalParams::flit_size = atoi(arg_vet[++i]);
+		GlobalParams::flit_size = atoi(requireOptionValue(i, arg_num, arg_vet, "-flit"));
 	    else if (!strcmp(arg_vet[i], "-winoc")) 
 		GlobalParams::use_winoc = true;
 	    else if (!strcmp(arg_vet[i], "-winoc_dst_hops")) 
 	    {
-            GlobalParams::winoc_dst_hops = atoi(arg_vet[++i]);
+            GlobalParams::winoc_dst_hops = atoi(requireOptionValue(i, arg_num, arg_vet, "-winoc_dst_hops"));
 	    }
 	    else if (!strcmp(arg_vet[i], "-wirxsleep")) 
 	    {
@@ -501,56 +527,56 @@ void parseCmdLine(int arg_num, char *arg_vet[])
 	    }
 	    else if (!strcmp(arg_vet[i], "-size")) 
 	    {
-		GlobalParams::min_packet_size = atoi(arg_vet[++i]);
-		GlobalParams::max_packet_size = atoi(arg_vet[++i]);
+		GlobalParams::min_packet_size = atoi(requireOptionValue(i, arg_num, arg_vet, "-size"));
+		GlobalParams::max_packet_size = atoi(requireOptionValue(i, arg_num, arg_vet, "-size"));
 	    } 
 	    else if (!strcmp(arg_vet[i], "-topology")) 
 	    {
-		    GlobalParams::topology = arg_vet[++i];
+		    GlobalParams::topology = requireOptionValue(i, arg_num, arg_vet, "-topology");
             cout << "Changing topology to " << GlobalParams::topology << endl;
         }
 	    else if (!strcmp(arg_vet[i], "-routing")) 
 	    {
-		GlobalParams::routing_algorithm = arg_vet[++i];
+		GlobalParams::routing_algorithm = requireOptionValue(i, arg_num, arg_vet, "-routing");
 		if (GlobalParams::routing_algorithm == ROUTING_DYAD)
-		    GlobalParams::dyad_threshold = atof(arg_vet[++i]);
+		    GlobalParams::dyad_threshold = atof(requireOptionValue(i, arg_num, arg_vet, "-routing"));
 		else if (GlobalParams::routing_algorithm == ROUTING_TABLE_BASED) 
 		{
-		    GlobalParams::routing_table_filename = arg_vet[++i];
+		    GlobalParams::routing_table_filename = requireOptionValue(i, arg_num, arg_vet, "-routing");
 		    GlobalParams::packet_injection_rate = 0;
 		} 
 	    } 
 	    else if (!strcmp(arg_vet[i], "-sel")) {
-		GlobalParams::selection_strategy = arg_vet[++i];
+		GlobalParams::selection_strategy = requireOptionValue(i, arg_num, arg_vet, "-sel");
 	    } 
 	    else if (!strcmp(arg_vet[i], "-pir")) 
 	    {
 		
-		GlobalParams::packet_injection_rate = atof(arg_vet[++i]);
-		char *distribution = arg_vet[i+1<arg_num?++i:i];
+		GlobalParams::packet_injection_rate = atof(requireOptionValue(i, arg_num, arg_vet, "-pir"));
+		char *distribution = requireOptionValue(i, arg_num, arg_vet, "-pir");
 		
 		if (!strcmp(distribution, "poisson"))
 		    GlobalParams::probability_of_retransmission = GlobalParams::packet_injection_rate;
 		else if (!strcmp(distribution, "burst")) 
 		{
-		    double burstness = atof(arg_vet[++i]);
+		    double burstness = atof(requireOptionValue(i, arg_num, arg_vet, "-pir"));
 		    GlobalParams::probability_of_retransmission = GlobalParams::packet_injection_rate / (1 - burstness);
 		} 
 		else if (!strcmp(distribution, "pareto")) {
-		    double Aon = atof(arg_vet[++i]);
-		    double Aoff = atof(arg_vet[++i]);
-		    double r = atof(arg_vet[++i]);
+		    double Aon = atof(requireOptionValue(i, arg_num, arg_vet, "-pir"));
+		    double Aoff = atof(requireOptionValue(i, arg_num, arg_vet, "-pir"));
+		    double r = atof(requireOptionValue(i, arg_num, arg_vet, "-pir"));
 		    GlobalParams::probability_of_retransmission =
 			GlobalParams::packet_injection_rate *
 			pow((1 - r), (1 / Aoff - 1 / Aon));
 		} 
 		else if (!strcmp(distribution, "custom"))
-		    GlobalParams::probability_of_retransmission = atof(arg_vet[++i]);
+		    GlobalParams::probability_of_retransmission = atof(requireOptionValue(i, arg_num, arg_vet, "-pir"));
 		else assert("Invalid pir format" && false);
 	    } 
 	    else if (!strcmp(arg_vet[i], "-traffic")) 
 	    {
-		char *traffic = arg_vet[++i];
+		char *traffic = requireOptionValue(i, arg_num, arg_vet, "-traffic");
 		if (!strcmp(traffic, "random")) GlobalParams::traffic_distribution = TRAFFIC_RANDOM;
 		else if (!strcmp(traffic, "transpose1"))
 		    GlobalParams::traffic_distribution =
@@ -573,43 +599,43 @@ void parseCmdLine(int arg_num, char *arg_vet[])
 		else if (!strcmp(traffic, "table")) {
 		    GlobalParams::traffic_distribution =
 			TRAFFIC_TABLE_BASED;
-		    GlobalParams::traffic_table_filename = arg_vet[++i];
+		    GlobalParams::traffic_table_filename = requireOptionValue(i, arg_num, arg_vet, "-traffic");
 		} else if (!strcmp(traffic, "hardcoded")) {
 		    GlobalParams::traffic_distribution =
 			TRAFFIC_HARDCODED;
-		    GlobalParams::traffic_hardcoded_filename = arg_vet[++i];
+		    GlobalParams::traffic_hardcoded_filename = requireOptionValue(i, arg_num, arg_vet, "-traffic");
 		} else if (!strcmp(traffic, "local")) {
 		    GlobalParams::traffic_distribution = TRAFFIC_LOCAL;
-		    GlobalParams::locality=atof(arg_vet[++i]);
+		    GlobalParams::locality = atof(requireOptionValue(i, arg_num, arg_vet, "-traffic"));
 		}
 		else assert(false);
 	    } 
 	    else if (!strcmp(arg_vet[i], "-hs")) 
 	    {
-		int node = atoi(arg_vet[++i]);
-		double percentage = atof(arg_vet[++i]);
+		int node = atoi(requireOptionValue(i, arg_num, arg_vet, "-hs"));
+		double percentage = atof(requireOptionValue(i, arg_num, arg_vet, "-hs"));
 		pair < int, double >t(node, percentage);
 		GlobalParams::hotspots.push_back(t);
 	    } 
 	    else if (!strcmp(arg_vet[i], "-warmup"))
-		GlobalParams::stats_warm_up_time = atoi(arg_vet[++i]);
+		GlobalParams::stats_warm_up_time = atoi(requireOptionValue(i, arg_num, arg_vet, "-warmup"));
 	    else if (!strcmp(arg_vet[i], "-seed"))
-		GlobalParams::rnd_generator_seed = atoi(arg_vet[++i]);
+		GlobalParams::rnd_generator_seed = atoi(requireOptionValue(i, arg_num, arg_vet, "-seed"));
 	    else if (!strcmp(arg_vet[i], "-detailed"))
 		GlobalParams::detailed = true;
 	    else if (!strcmp(arg_vet[i], "-show_buf_stats"))
 		GlobalParams::show_buffer_stats = true;
 	    else if (!strcmp(arg_vet[i], "-volume"))
 		GlobalParams::max_volume_to_be_drained =
-		    atoi(arg_vet[++i]);
+		    atoi(requireOptionValue(i, arg_num, arg_vet, "-volume"));
 	    else if (!strcmp(arg_vet[i], "-sim"))
-		GlobalParams::simulation_time = atoi(arg_vet[++i]);
+		GlobalParams::simulation_time = atoi(requireOptionValue(i, arg_num, arg_vet, "-sim"));
 	    else if (!strcmp(arg_vet[i], "-asciimonitor")) 
 		GlobalParams::ascii_monitor = true;
 	    else if (!strcmp(arg_vet[i], "-config") || !strcmp(arg_vet[i], "-power"))
 		// -config is managed from configure function
 		// i++ skips the configuration file name 
-		i++;
+		requireOptionValue(i, arg_num, arg_vet, arg_vet[i]);
 	    else {
 		cerr << "Error: Invalid option: " << arg_vet[i] << endl;
 		exit(1);
@@ -634,7 +660,7 @@ void configure(int arg_num, char *arg_vet[]) {
 
     for (int i = 1; i < arg_num; i++) {
 	    if (!strcmp(arg_vet[i], "-config")) {
-            GlobalParams::config_filename = arg_vet[++i];
+            GlobalParams::config_filename = requireOptionValue(i, arg_num, arg_vet, "-config");
             config_found = true;
             break;
         }
@@ -654,7 +680,7 @@ void configure(int arg_num, char *arg_vet[]) {
 
     for (int i = 1; i < arg_num; i++) {
 	    if (!strcmp(arg_vet[i], "-power")) {
-            GlobalParams::power_config_filename = arg_vet[++i];
+            GlobalParams::power_config_filename = requireOptionValue(i, arg_num, arg_vet, "-power");
             power_config_found = true;
             break;
         }
@@ -678,7 +704,7 @@ void configure(int arg_num, char *arg_vet[]) {
     checkConfiguration();
 
     // Show configuration
-    if (GlobalParams::verbose_mode > VERBOSE_OFF)
+    if (GlobalParams::verbose_mode != VERBOSE_OFF)
 	showConfig();
 }
 

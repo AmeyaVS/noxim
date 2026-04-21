@@ -446,7 +446,7 @@ vector < int > Router::routingFunction(const RouteData & route_data)
 		}
 	}
 	// TODO: fix all the deprecated verbose mode logs
-	if (GlobalParams::verbose_mode > VERBOSE_OFF)
+	if (GlobalParams::verbose_mode != VERBOSE_OFF)
 		LOG << "Wired routing for dst = " << route_data.dst_id << endl;
 
 	// not wireless direction taken, apply normal routing
