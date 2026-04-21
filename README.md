@@ -49,9 +49,24 @@ Similarly for macOS:
 
     /bin/zsh -c "$(curl -fsSL https://raw.githubusercontent.com/davidepatti/noxim/master/other/setup/macos.zsh)"
 
-Or, to get just the latest master sources, you can run:
+As an alternative to the full automatic setup scripts above, you can just clone the sources:
 
     git clone https://github.com/davidepatti/noxim.git
+    cd noxim
+
+and then build from the repository root with:
+
+    ./build.sh
+
+This fixes the local dependencies under `bin/libs` and compiles `bin/noxim`.
+
+If you already cloned the repository and want to populate the local dependencies expected by
+`bin/Makefile`, run:
+
+    ./other/setup/fix-dependencies.sh
+
+This installs SystemC into `bin/libs/systemc-2.3.1` and yaml-cpp into `bin/libs/yaml-cpp`.
+`./other/setup/systemc.sh` is kept as a compatibility alias to the same flow.
 
 Noxim has a command line interface for defining several parameters of a NoC. In particular the
 user can customize the network size, buffer size, packet size distribution, routing algorithm,
@@ -70,5 +85,3 @@ exploration phase. Infact, Noxim Explorer executes many simulations using Noxim 
 the design space, and modifying the conﬁguration parameters for each simulation. Noxim Explorer will
 create new configuration parameters for you, or complete the exploration according to the information
 read from a script (known as exploration script or space file).
-
-
