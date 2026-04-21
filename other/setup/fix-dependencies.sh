@@ -15,10 +15,13 @@ SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(CDPATH= cd -- "${SCRIPT_DIR}/../.." && pwd)"
 BIN_DIR="${REPO_ROOT}/bin"
 LIBS_DIR="${BIN_DIR}/libs"
+BACKUP_DIR="${REPO_ROOT}/other/deps-backup"
 
 SYSTEMC_DIR="${LIBS_DIR}/${SYSTEMC_VERSION}"
 YAML_DIR="${LIBS_DIR}/yaml-cpp"
 YAML_BUILD_DIR="${YAML_DIR}/lib"
+BACKUP_SYSTEMC_ARCHIVE="${BACKUP_DIR}/${SYSTEMC_ARCHIVE}"
+BACKUP_YAML_ARCHIVE="${BACKUP_DIR}/yaml-cpp-yaml-cpp-0.6.0-2dc9ce159652.tar.gz"
 
 usage() {
     cat <<EOF
@@ -102,6 +105,12 @@ download_systemc_archive() {
 
     if [[ -f "${archive_path}" ]]; then
         log "Using existing archive ${archive_path}"
+        return
+    fi
+
+    if [[ -f "${BACKUP_SYSTEMC_ARCHIVE}" ]]; then
+        log "Using local backup ${BACKUP_SYSTEMC_ARCHIVE}"
+        cp "${BACKUP_SYSTEMC_ARCHIVE}" "${archive_path}"
         return
     fi
 
@@ -262,6 +271,14 @@ ensure_yaml_source() {
     if [[ -d "${YAML_DIR}" ]]; then
         [[ -f "${YAML_DIR}/CMakeLists.txt" ]] || fail "Expected ${YAML_DIR} to contain yaml-cpp sources"
         log "Using existing yaml-cpp source in ${YAML_DIR}"
+        return
+    fi
+
+    if [[ -f "${BACKUP_YAML_ARCHIVE}" ]]; then
+        require_command tar
+        log "Using local backup ${BACKUP_YAML_ARCHIVE}"
+        tar -xzf "${BACKUP_YAML_ARCHIVE}" -C "${LIBS_DIR}"
+        [[ -f "${YAML_DIR}/CMakeLists.txt" ]] || fail "Expected ${YAML_DIR} after extracting ${BACKUP_YAML_ARCHIVE}"
         return
     fi
 
