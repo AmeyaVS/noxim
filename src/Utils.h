@@ -15,43 +15,9 @@
 #include <tlm>
 
 #include "DataStructs.h"
+#include "Logger.h"
 #include <iomanip>
 #include <sstream>
-
-#ifdef DEBUG
-
-#define LOG (std::cout << std::setw(7) << left << sc_time_stamp().to_double() / GlobalParams::clock_period_ps << " " << name() << "::" << __func__<< "() --> ")
-
-#else
-template <class cT, class traits = std::char_traits<cT> >
-class basic_nullbuf: public std::basic_streambuf<cT, traits> {
-    typename traits::int_type overflow(typename traits::int_type c)
-    {
-        return traits::not_eof(c); // indicate success
-    }
-};
-
-template <class cT, class traits = std::char_traits<cT> >
-class basic_onullstream: public std::basic_ostream<cT, traits> {
-public:
-    basic_onullstream():
-    std::basic_ios<cT, traits>(&m_sbuf),
-    std::basic_ostream<cT, traits>(&m_sbuf)
-    {
-        // note: the original code is missing the required this->
-        this->init(&m_sbuf);
-    }
-
-private:
-    basic_nullbuf<cT, traits> m_sbuf;
-};
-
-typedef basic_onullstream<char> onullstream;
-typedef basic_onullstream<wchar_t> wonullstream;
-
-static onullstream LOG;
-
-#endif
 
 // Output overloading
 
@@ -141,26 +107,37 @@ inline ostream & operator <<(ostream & os, const Coord & coord)
 
 // Trace overloading
 
-inline void sc_trace(sc_trace_file * &tf, const Flit & flit, string & name)
+inline void sc_trace(sc_trace_file * &tf, const Flit & flit, const string & name)
 {
     sc_trace(tf, flit.src_id, name + ".src_id");
     sc_trace(tf, flit.dst_id, name + ".dst_id");
+    sc_trace(tf, flit.vc_id, name + ".vc_id");
+    sc_trace(tf, flit.flit_type, name + ".flit_type");
     sc_trace(tf, flit.sequence_no, name + ".sequence_no");
+    sc_trace(tf, flit.sequence_length, name + ".sequence_length");
     sc_trace(tf, flit.timestamp, name + ".timestamp");
     sc_trace(tf, flit.hop_no, name + ".hop_no");
+    sc_trace(tf, flit.use_low_voltage_path, name + ".use_low_voltage_path");
+    sc_trace(tf, flit.hub_relay_node, name + ".hub_relay_node");
 }
 
-inline void sc_trace(sc_trace_file * &tf, const NoP_data & NoP_data, string & name)
+inline void sc_trace(sc_trace_file * &tf, const NoP_data & NoP_data, const string & name)
 {
     sc_trace(tf, NoP_data.sender_id, name + ".sender_id");
+    for (int direction = 0; direction < DIRECTIONS; direction++) {
+        sc_trace(tf, NoP_data.channel_status_neighbor[direction].free_slots,
+                 name + ".dir" + to_string(direction) + ".free_slots");
+        sc_trace(tf, NoP_data.channel_status_neighbor[direction].available,
+                 name + ".dir" + to_string(direction) + ".available");
+    }
 }
-inline void sc_trace(sc_trace_file * &tf, const TBufferFullStatus & bfs, string & name)
+inline void sc_trace(sc_trace_file * &tf, const TBufferFullStatus & bfs, const string & name)
 {
     for (int j = 0; j < GlobalParams::n_virtual_channels; j++)
 	sc_trace(tf, bfs.mask[j], name + "VC "+to_string(j));
 }
 
-inline void sc_trace(sc_trace_file * &tf, const ChannelStatus & bs, string & name)
+inline void sc_trace(sc_trace_file * &tf, const ChannelStatus & bs, const string & name)
 {
     sc_trace(tf, bs.free_slots, name + ".free_slots");
     sc_trace(tf, bs.available, name + ".available");

@@ -13,14 +13,208 @@
 #include "GlobalStats.h"
 #include "DataStructs.h"
 #include "GlobalParams.h"
+#include "Logger.h"
 
 #include <csignal>
+#include <set>
+#include <sstream>
 
 using namespace std;
 
 // need to be globally visible to allow "-volume" simulation stop
 unsigned int drained_volume;
 NoC *n;
+
+namespace {
+
+int getDeltaStages()
+{
+    int stages = 0;
+    int tiles = GlobalParams::n_delta_tiles;
+    while (tiles > 1) {
+        tiles /= 2;
+        stages++;
+    }
+    return stages;
+}
+
+int getSwitchDimX()
+{
+    if (GlobalParams::topology == TOPOLOGY_MESH)
+        return GlobalParams::mesh_dim_x + 1;
+
+    return getDeltaStages();
+}
+
+int getSwitchDimY()
+{
+    if (GlobalParams::topology == TOPOLOGY_MESH)
+        return GlobalParams::mesh_dim_y + 1;
+
+    return GlobalParams::n_delta_tiles / 2;
+}
+
+int getCoreCount()
+{
+    if (GlobalParams::topology == TOPOLOGY_MESH)
+        return GlobalParams::mesh_dim_x * GlobalParams::mesh_dim_y;
+
+    return GlobalParams::n_delta_tiles;
+}
+
+set<string> parseTraceScopes(const string &trace_scope)
+{
+    set<string> scopes;
+    stringstream ss(trace_scope);
+    string token;
+
+    while (getline(ss, token, ',')) {
+        if (!token.empty())
+            scopes.insert(token);
+    }
+
+    if (scopes.empty())
+        scopes.insert("basic");
+
+    return scopes;
+}
+
+bool traceScopeEnabled(const set<string> &scopes, const string &scope)
+{
+    return scopes.count("all") != 0 || scopes.count(scope) != 0;
+}
+
+template <typename T>
+void traceNamed(sc_trace_file *tf, const sc_signal<T> &signal, const string &name)
+{
+    string label = name;
+    const sc_signal_in_if<T> &signal_if = signal;
+    sc_trace(tf, signal_if, label);
+}
+
+template <typename T>
+void traceCardinalSignals(sc_trace_file *tf, sc_signal_NSWEH<T> &signals, const string &prefix)
+{
+    traceNamed(tf, signals.east, prefix + ".east");
+    traceNamed(tf, signals.west, prefix + ".west");
+    traceNamed(tf, signals.south, prefix + ".south");
+    traceNamed(tf, signals.north, prefix + ".north");
+}
+
+template <typename T>
+void traceHubSignals(sc_trace_file *tf, sc_signal_NSWEH<T> &signals, const string &prefix)
+{
+    traceNamed(tf, signals.to_hub, prefix + ".to_hub");
+    traceNamed(tf, signals.from_hub, prefix + ".from_hub");
+}
+
+template <typename T>
+void traceCardinalSignals(sc_trace_file *tf, sc_signal_NSWE<T> &signals, const string &prefix)
+{
+    traceNamed(tf, signals.east, prefix + ".east");
+    traceNamed(tf, signals.west, prefix + ".west");
+    traceNamed(tf, signals.south, prefix + ".south");
+    traceNamed(tf, signals.north, prefix + ".north");
+}
+
+string matrixLabel(const string &prefix, int x, int y)
+{
+    ostringstream out;
+    out << prefix << "(" << x << ")(" << y << ")";
+    return out.str();
+}
+
+string indexedLabel(const string &prefix, int index)
+{
+    ostringstream out;
+    out << prefix << "(" << index << ")";
+    return out.str();
+}
+
+void traceBasicSignals(sc_trace_file *tf, NoC *noc, int dim_x, int dim_y)
+{
+    for (int i = 0; i < dim_x; i++) {
+        for (int j = 0; j < dim_y; j++) {
+            traceCardinalSignals(tf, noc->req[i][j], matrixLabel("req", i, j));
+            traceCardinalSignals(tf, noc->ack[i][j], matrixLabel("ack", i, j));
+        }
+    }
+}
+
+void traceRouterSignals(sc_trace_file *tf, NoC *noc, int dim_x, int dim_y)
+{
+    for (int i = 0; i < dim_x; i++) {
+        for (int j = 0; j < dim_y; j++) {
+            traceCardinalSignals(tf, noc->flit[i][j], matrixLabel("flit", i, j));
+            traceCardinalSignals(tf, noc->nop_data[i][j], matrixLabel("nop", i, j));
+        }
+    }
+}
+
+void traceBufferSignals(sc_trace_file *tf, NoC *noc, int dim_x, int dim_y)
+{
+    for (int i = 0; i < dim_x; i++) {
+        for (int j = 0; j < dim_y; j++) {
+            traceCardinalSignals(tf, noc->buffer_full_status[i][j], matrixLabel("buffer_full_status", i, j));
+            traceCardinalSignals(tf, noc->free_slots[i][j], matrixLabel("free_slots", i, j));
+        }
+    }
+}
+
+void traceWirelessSignals(sc_trace_file *tf, NoC *noc, int dim_x, int dim_y)
+{
+    for (int i = 0; i < dim_x; i++) {
+        for (int j = 0; j < dim_y; j++) {
+            traceHubSignals(tf, noc->req[i][j], matrixLabel("req", i, j));
+            traceHubSignals(tf, noc->ack[i][j], matrixLabel("ack", i, j));
+            traceHubSignals(tf, noc->flit[i][j], matrixLabel("flit", i, j));
+            traceHubSignals(tf, noc->buffer_full_status[i][j], matrixLabel("buffer_full_status", i, j));
+        }
+    }
+
+    if (GlobalParams::topology != TOPOLOGY_MESH) {
+        const int cores = getCoreCount();
+        for (int core = 0; core < cores; core++) {
+            traceNamed(tf, noc->req_from_hub[core], indexedLabel("req_from_hub", core));
+            traceNamed(tf, noc->req_to_hub[core], indexedLabel("req_to_hub", core));
+            traceNamed(tf, noc->ack_from_hub[core], indexedLabel("ack_from_hub", core));
+            traceNamed(tf, noc->ack_to_hub[core], indexedLabel("ack_to_hub", core));
+            traceNamed(tf, noc->flit_from_hub[core], indexedLabel("flit_from_hub", core));
+            traceNamed(tf, noc->flit_to_hub[core], indexedLabel("flit_to_hub", core));
+            traceNamed(tf, noc->buffer_full_status_from_hub[core], indexedLabel("buffer_full_status_from_hub", core));
+            traceNamed(tf, noc->buffer_full_status_to_hub[core], indexedLabel("buffer_full_status_to_hub", core));
+        }
+    }
+
+    if (!GlobalParams::use_winoc || noc->token_ring == NULL)
+        return;
+
+    for (map<int, sc_signal<int>* >::const_iterator it = noc->token_ring->token_holder_signals.begin();
+         it != noc->token_ring->token_holder_signals.end();
+         ++it) {
+        traceNamed(tf, *(it->second), "tokenring.channel_" + to_string(it->first) + ".holder");
+    }
+
+    for (map<int, sc_signal<int>* >::const_iterator it = noc->token_ring->token_expiration_signals.begin();
+         it != noc->token_ring->token_expiration_signals.end();
+         ++it) {
+        traceNamed(tf, *(it->second), "tokenring.channel_" + to_string(it->first) + ".expiration");
+    }
+
+    for (map<int, map<int, sc_signal<int>* > >::const_iterator channel_it = noc->token_ring->flag_signals.begin();
+         channel_it != noc->token_ring->flag_signals.end();
+         ++channel_it) {
+        for (map<int, sc_signal<int>* >::const_iterator hub_it = channel_it->second.begin();
+             hub_it != channel_it->second.end();
+             ++hub_it) {
+            traceNamed(tf, *(hub_it->second),
+                       "tokenring.channel_" + to_string(channel_it->first) +
+                       ".flag_hub_" + to_string(hub_it->first));
+        }
+    }
+}
+
+} // namespace
 
 void signalHandler( int signum )
 {
@@ -50,6 +244,10 @@ int sc_main(int arg_num, char *arg_vet[])
     cout << endl;
 
     configure(arg_num, arg_vet);
+    noxim::Logger::instance().configure(GlobalParams::log_level,
+                                        GlobalParams::log_file,
+                                        GlobalParams::log_to_stderr,
+                                        GlobalParams::log_components);
 
 
     // Signals
@@ -68,30 +266,21 @@ int sc_main(int arg_num, char *arg_vet[])
 	tf = sc_create_vcd_trace_file(GlobalParams::trace_filename.c_str());
 	sc_trace(tf, reset, "reset");
 	sc_trace(tf, clock, "clock");
+        const set<string> scopes = parseTraceScopes(GlobalParams::trace_scope);
+        const int dim_x = getSwitchDimX();
+        const int dim_y = getSwitchDimY();
 
-	for (int i = 0; i < GlobalParams::mesh_dim_x; i++) {
-	    for (int j = 0; j < GlobalParams::mesh_dim_y; j++) {
-		char label[64];
+        if (traceScopeEnabled(scopes, "basic"))
+            traceBasicSignals(tf, n, dim_x, dim_y);
 
-		sprintf(label, "req(%02d)(%02d).east", i, j);
-		sc_trace(tf, n->req[i][j].east, label);
-		sprintf(label, "req(%02d)(%02d).west", i, j);
-		sc_trace(tf, n->req[i][j].west, label);
-		sprintf(label, "req(%02d)(%02d).south", i, j);
-		sc_trace(tf, n->req[i][j].south, label);
-		sprintf(label, "req(%02d)(%02d).north", i, j);
-		sc_trace(tf, n->req[i][j].north, label);
+        if (traceScopeEnabled(scopes, "router"))
+            traceRouterSignals(tf, n, dim_x, dim_y);
 
-		sprintf(label, "ack(%02d)(%02d).east", i, j);
-		sc_trace(tf, n->ack[i][j].east, label);
-		sprintf(label, "ack(%02d)(%02d).west", i, j);
-		sc_trace(tf, n->ack[i][j].west, label);
-		sprintf(label, "ack(%02d)(%02d).south", i, j);
-		sc_trace(tf, n->ack[i][j].south, label);
-		sprintf(label, "ack(%02d)(%02d).north", i, j);
-		sc_trace(tf, n->ack[i][j].north, label);
-	    }
-	}
+        if (traceScopeEnabled(scopes, "buffers"))
+            traceBufferSignals(tf, n, dim_x, dim_y);
+
+        if (traceScopeEnabled(scopes, "wireless"))
+            traceWirelessSignals(tf, n, dim_x, dim_y);
     }
     // Reset the chip and run the simulation
     reset.write(1);
@@ -119,6 +308,8 @@ int sc_main(int arg_num, char *arg_vet[])
     // Show statistics
     GlobalStats gs(n);
     gs.showStats(std::cout, GlobalParams::detailed);
+    if (!GlobalParams::stats_file.empty())
+        gs.exportStats(GlobalParams::stats_format, GlobalParams::stats_file, GlobalParams::detailed);
 
 
     if ((GlobalParams::max_volume_to_be_drained > 0) &&
@@ -142,5 +333,6 @@ int sc_main(int arg_num, char *arg_vet[])
 #ifdef DEADLOCK_AVOIDANCE
 	cout << "***** WARNING: DEADLOCK_AVOIDANCE ENABLED!" << endl;
 #endif
+    noxim::Logger::instance().shutdown();
     return 0;
 }

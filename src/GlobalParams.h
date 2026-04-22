@@ -141,8 +141,15 @@ typedef struct {
 
 struct GlobalParams {
     static string verbose_mode;
+    static string log_level;
+    static string log_file;
+    static bool log_to_stderr;
+    static vector<string> log_components;
+    static string stats_format;
+    static string stats_file;
     static int trace_mode;
     static string trace_filename;
+    static string trace_scope;
     static string topology;
     static int mesh_dim_x;
     static int mesh_dim_y;

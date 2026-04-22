@@ -9,7 +9,181 @@
  */
 
 #include "GlobalStats.h"
+
+#include <cmath>
+#include <fstream>
+#include <limits>
+#include <sstream>
+
 using namespace std;
+
+namespace {
+
+struct SummaryMetrics {
+    unsigned int total_received_packets;
+    unsigned int total_received_flits;
+    double received_ideal_flits_ratio;
+    double average_wireless_utilization;
+    double global_average_delay_cycles;
+    double max_delay_cycles;
+    double network_throughput_flits_per_cycle;
+    double average_ip_throughput_flits_per_cycle_per_ip;
+    double total_energy_j;
+    double dynamic_energy_j;
+    double static_energy_j;
+    double executed_cycles;
+};
+
+SummaryMetrics buildSummaryMetrics(GlobalStats &stats)
+{
+    SummaryMetrics metrics;
+    metrics.total_received_packets = stats.getReceivedPackets();
+    metrics.total_received_flits = stats.getReceivedFlits();
+    metrics.received_ideal_flits_ratio = stats.getReceivedIdealFlitRatio();
+    metrics.average_wireless_utilization =
+        stats.getWirelessPackets() / (double)metrics.total_received_packets;
+    metrics.global_average_delay_cycles = stats.getAverageDelay();
+    metrics.max_delay_cycles = stats.getMaxDelay();
+    metrics.network_throughput_flits_per_cycle = stats.getAggregatedThroughput();
+    metrics.average_ip_throughput_flits_per_cycle_per_ip = stats.getThroughput();
+    metrics.total_energy_j = stats.getTotalPower();
+    metrics.dynamic_energy_j = stats.getDynamicPower();
+    metrics.static_energy_j = stats.getStaticPower();
+    metrics.executed_cycles = sc_time_stamp().to_double() / GlobalParams::clock_period_ps;
+    return metrics;
+}
+
+string csvNumber(double value)
+{
+    if (!std::isfinite(value))
+        return "nan";
+
+    ostringstream out;
+    out.precision(17);
+    out << value;
+    return out.str();
+}
+
+string jsonString(const string &value)
+{
+    ostringstream out;
+    out << '"';
+    for (size_t i = 0; i < value.size(); ++i) {
+        const char ch = value[i];
+        switch (ch) {
+        case '\\':
+            out << "\\\\";
+            break;
+        case '"':
+            out << "\\\"";
+            break;
+        case '\n':
+            out << "\\n";
+            break;
+        case '\r':
+            out << "\\r";
+            break;
+        case '\t':
+            out << "\\t";
+            break;
+        default:
+            out << ch;
+            break;
+        }
+    }
+    out << '"';
+    return out.str();
+}
+
+string jsonNumber(double value)
+{
+    if (!std::isfinite(value))
+        return "null";
+
+    ostringstream out;
+    out.precision(17);
+    out << value;
+    return out.str();
+}
+
+void writeCsvSummary(ostream &out, const SummaryMetrics &metrics)
+{
+    out << "topology"
+        << ",mesh_dim_x"
+        << ",mesh_dim_y"
+        << ",n_delta_tiles"
+        << ",simulation_time_cycles"
+        << ",reset_time_cycles"
+        << ",stats_warm_up_time_cycles"
+        << ",executed_cycles"
+        << ",rnd_generator_seed"
+        << ",total_received_packets"
+        << ",total_received_flits"
+        << ",received_ideal_flits_ratio"
+        << ",average_wireless_utilization"
+        << ",global_average_delay_cycles"
+        << ",max_delay_cycles"
+        << ",network_throughput_flits_per_cycle"
+        << ",average_ip_throughput_flits_per_cycle_per_ip"
+        << ",total_energy_j"
+        << ",dynamic_energy_j"
+        << ",static_energy_j"
+        << endl;
+
+    out << GlobalParams::topology
+        << "," << GlobalParams::mesh_dim_x
+        << "," << GlobalParams::mesh_dim_y
+        << "," << GlobalParams::n_delta_tiles
+        << "," << GlobalParams::simulation_time
+        << "," << GlobalParams::reset_time
+        << "," << GlobalParams::stats_warm_up_time
+        << "," << csvNumber(metrics.executed_cycles)
+        << "," << GlobalParams::rnd_generator_seed
+        << "," << metrics.total_received_packets
+        << "," << metrics.total_received_flits
+        << "," << csvNumber(metrics.received_ideal_flits_ratio)
+        << "," << csvNumber(metrics.average_wireless_utilization)
+        << "," << csvNumber(metrics.global_average_delay_cycles)
+        << "," << csvNumber(metrics.max_delay_cycles)
+        << "," << csvNumber(metrics.network_throughput_flits_per_cycle)
+        << "," << csvNumber(metrics.average_ip_throughput_flits_per_cycle_per_ip)
+        << "," << csvNumber(metrics.total_energy_j)
+        << "," << csvNumber(metrics.dynamic_energy_j)
+        << "," << csvNumber(metrics.static_energy_j)
+        << endl;
+}
+
+void writeJsonSummary(ostream &out, const SummaryMetrics &metrics)
+{
+    out << "{" << endl;
+    out << "  \"config\": {" << endl;
+    out << "    \"topology\": " << jsonString(GlobalParams::topology) << "," << endl;
+    out << "    \"mesh_dim_x\": " << GlobalParams::mesh_dim_x << "," << endl;
+    out << "    \"mesh_dim_y\": " << GlobalParams::mesh_dim_y << "," << endl;
+    out << "    \"n_delta_tiles\": " << GlobalParams::n_delta_tiles << "," << endl;
+    out << "    \"simulation_time_cycles\": " << GlobalParams::simulation_time << "," << endl;
+    out << "    \"reset_time_cycles\": " << GlobalParams::reset_time << "," << endl;
+    out << "    \"stats_warm_up_time_cycles\": " << GlobalParams::stats_warm_up_time << "," << endl;
+    out << "    \"rnd_generator_seed\": " << GlobalParams::rnd_generator_seed << endl;
+    out << "  }," << endl;
+    out << "  \"summary\": {" << endl;
+    out << "    \"executed_cycles\": " << jsonNumber(metrics.executed_cycles) << "," << endl;
+    out << "    \"total_received_packets\": " << metrics.total_received_packets << "," << endl;
+    out << "    \"total_received_flits\": " << metrics.total_received_flits << "," << endl;
+    out << "    \"received_ideal_flits_ratio\": " << jsonNumber(metrics.received_ideal_flits_ratio) << "," << endl;
+    out << "    \"average_wireless_utilization\": " << jsonNumber(metrics.average_wireless_utilization) << "," << endl;
+    out << "    \"global_average_delay_cycles\": " << jsonNumber(metrics.global_average_delay_cycles) << "," << endl;
+    out << "    \"max_delay_cycles\": " << jsonNumber(metrics.max_delay_cycles) << "," << endl;
+    out << "    \"network_throughput_flits_per_cycle\": " << jsonNumber(metrics.network_throughput_flits_per_cycle) << "," << endl;
+    out << "    \"average_ip_throughput_flits_per_cycle_per_ip\": " << jsonNumber(metrics.average_ip_throughput_flits_per_cycle_per_ip) << "," << endl;
+    out << "    \"total_energy_j\": " << jsonNumber(metrics.total_energy_j) << "," << endl;
+    out << "    \"dynamic_energy_j\": " << jsonNumber(metrics.dynamic_energy_j) << "," << endl;
+    out << "    \"static_energy_j\": " << jsonNumber(metrics.static_energy_j) << endl;
+    out << "  }" << endl;
+    out << "}" << endl;
+}
+
+} // namespace
 
 GlobalStats::GlobalStats(const NoC * _noc)
 {
@@ -506,21 +680,47 @@ void GlobalStats::showStats(std::ostream & out, bool detailed)
 #endif
 
     //int total_cycles = GlobalParams::simulation_time - GlobalParams::stats_warm_up_time;
-    out << "% Total received packets: " << getReceivedPackets() << endl;
-    out << "% Total received flits: " << getReceivedFlits() << endl;
-    out << "% Received/Ideal flits Ratio: " << getReceivedIdealFlitRatio() << endl;
-    out << "% Average wireless utilization: " << getWirelessPackets()/(double)getReceivedPackets() << endl;
-    out << "% Global average delay (cycles): " << getAverageDelay() << endl;
-    out << "% Max delay (cycles): " << getMaxDelay() << endl;
-    out << "% Network throughput (flits/cycle): " << getAggregatedThroughput() << endl;
-    out << "% Average IP throughput (flits/cycle/IP): " << getThroughput() << endl;
-    out << "% Total energy (J): " << getTotalPower() << endl;
-    out << "% \tDynamic energy (J): " << getDynamicPower() << endl;
-    out << "% \tStatic energy (J): " << getStaticPower() << endl;
+    SummaryMetrics metrics = buildSummaryMetrics(*this);
+    out << "% Total received packets: " << metrics.total_received_packets << endl;
+    out << "% Total received flits: " << metrics.total_received_flits << endl;
+    out << "% Received/Ideal flits Ratio: " << metrics.received_ideal_flits_ratio << endl;
+    out << "% Average wireless utilization: " << metrics.average_wireless_utilization << endl;
+    out << "% Global average delay (cycles): " << metrics.global_average_delay_cycles << endl;
+    out << "% Max delay (cycles): " << metrics.max_delay_cycles << endl;
+    out << "% Network throughput (flits/cycle): " << metrics.network_throughput_flits_per_cycle << endl;
+    out << "% Average IP throughput (flits/cycle/IP): " << metrics.average_ip_throughput_flits_per_cycle_per_ip << endl;
+    out << "% Total energy (J): " << metrics.total_energy_j << endl;
+    out << "% \tDynamic energy (J): " << metrics.dynamic_energy_j << endl;
+    out << "% \tStatic energy (J): " << metrics.static_energy_j << endl;
 
     if (GlobalParams::show_buffer_stats)
       showBufferStats(out);
 
+}
+
+void GlobalStats::exportStats(const string &format, const string &filename, bool detailed)
+{
+    ofstream out(filename.c_str(), ios::out | ios::trunc);
+    if (!out.good()) {
+        cerr << "Error: Cannot open stats file " << filename << endl;
+        exit(1);
+    }
+
+    if (format == "text") {
+        showStats(out, detailed);
+        return;
+    }
+
+    SummaryMetrics metrics = buildSummaryMetrics(*this);
+
+    if (format == "csv")
+        writeCsvSummary(out, metrics);
+    else if (format == "json")
+        writeJsonSummary(out, metrics);
+    else {
+        cerr << "Error: Unsupported stats format " << format << endl;
+        exit(1);
+    }
 }
 
 void GlobalStats::updatePowerBreakDown(map<string,double> &dst,PowerBreakdown* src)

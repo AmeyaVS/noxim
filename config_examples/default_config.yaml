@@ -142,9 +142,34 @@ use_wirxsleep: false
 #   VERBOSE_HIGH
 verbose_mode: VERBOSE_OFF
 
+# Runtime logs:
+#   OFF
+#   ERROR
+#   WARN
+#   INFO
+#   DEBUG
+#   TRACE
+log_level: OFF
+log_file: ""
+log_to_stderr: true
+log_components: []
+
+# Optional stats export:
+#   text
+#   csv
+#   json
+stats_format: text
+stats_file: ""
+
 # Trace
 trace_mode: false
 trace_filename: ""
+#   basic: clock/reset + req/ack handshakes
+#   router: flits + NoP router signals
+#   buffers: buffer-full and free-slot signals
+#   wireless: hub/core wireless links + token-ring signals
+#   all: all of the above
+trace_scope: basic
 
 min_packet_size: 8
 max_packet_size: 8

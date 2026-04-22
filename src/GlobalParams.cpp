@@ -11,8 +11,15 @@
 #include "GlobalParams.h"
 
 string GlobalParams::verbose_mode;
+string GlobalParams::log_level;
+string GlobalParams::log_file;
+bool GlobalParams::log_to_stderr;
+vector<string> GlobalParams::log_components;
+string GlobalParams::stats_format;
+string GlobalParams::stats_file;
 int GlobalParams::trace_mode;
 string GlobalParams::trace_filename;
+string GlobalParams::trace_scope;
 
 string GlobalParams::topology;
 

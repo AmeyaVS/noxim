@@ -14,6 +14,7 @@
 #include <iostream>
 #include <vector>
 #include <iomanip>
+#include <string>
 #include "NoC.h"
 #include "Tile.h"
 using namespace std;
@@ -80,6 +81,7 @@ class GlobalStats {
 
     // Shows global statistics
     void showStats(std::ostream & out = std::cout, bool detailed = false);
+    void exportStats(const string &format, const string &filename, bool detailed = false);
 
     void showBufferStats(std::ostream & out);
 

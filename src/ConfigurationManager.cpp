@@ -10,6 +10,9 @@
 
 #include "ConfigurationManager.h"
 #include <systemc.h> //Included for the function time() 
+#include <algorithm>
+#include <cctype>
+#include <sstream>
 
 YAML::Node config;
 YAML::Node power_config;
@@ -38,6 +41,87 @@ static string parseVerboseMode(const char *value)
     cerr << "Error: Invalid verbosity level: " << value << endl;
     cerr << "Valid values are 0-3 or VERBOSE_OFF/VERBOSE_LOW/VERBOSE_MEDIUM/VERBOSE_HIGH" << endl;
     exit(1);
+}
+
+static string normalizeStatsFormat(const char *value)
+{
+    string format = value ? value : "";
+    for (size_t i = 0; i < format.size(); ++i)
+        format[i] = static_cast<char>(tolower(static_cast<unsigned char>(format[i])));
+
+    if (format == "text" || format == "csv" || format == "json")
+        return format;
+
+    cerr << "Error: Invalid stats format: " << value << endl;
+    cerr << "Valid values are text, csv, json" << endl;
+    exit(1);
+}
+
+static string joinStrings(const vector<string> &values, const string &separator)
+{
+    string joined;
+    for (size_t i = 0; i < values.size(); ++i) {
+        if (i != 0)
+            joined += separator;
+        joined += values[i];
+    }
+    return joined;
+}
+
+static string normalizeTraceScope(const char *value)
+{
+    vector<string> scopes;
+    stringstream ss(value ? value : "");
+    string token;
+
+    while (getline(ss, token, ',')) {
+        const size_t begin = token.find_first_not_of(" \t");
+        if (begin == string::npos)
+            continue;
+        const size_t end = token.find_last_not_of(" \t");
+        string scope = token.substr(begin, end - begin + 1);
+
+        for (size_t i = 0; i < scope.size(); ++i)
+            scope[i] = static_cast<char>(tolower(static_cast<unsigned char>(scope[i])));
+
+        if (scope == "all")
+            return "all";
+
+        if (scope != "basic" &&
+            scope != "router" &&
+            scope != "buffers" &&
+            scope != "wireless")
+        {
+            cerr << "Error: Invalid trace scope: " << scope << endl;
+            cerr << "Valid values are basic, router, buffers, wireless, all" << endl;
+            exit(1);
+        }
+
+        if (find(scopes.begin(), scopes.end(), scope) == scopes.end())
+            scopes.push_back(scope);
+    }
+
+    if (scopes.empty())
+        return "basic";
+
+    return joinStrings(scopes, ",");
+}
+
+static vector<string> parseLogComponents(const char *value)
+{
+    vector<string> components;
+    stringstream ss(value ? value : "");
+    string token;
+
+    while (getline(ss, token, ',')) {
+        const size_t begin = token.find_first_not_of(" \t");
+        if (begin == string::npos)
+            continue;
+        const size_t end = token.find_last_not_of(" \t");
+        components.push_back(token.substr(begin, end - begin + 1));
+    }
+
+    return components;
 }
 
 void loadConfiguration() {
@@ -72,8 +156,15 @@ void loadConfiguration() {
 
     // Initialize global configuration parameters (can be overridden with command-line arguments)
     GlobalParams::verbose_mode = readParam<string>(config, "verbose_mode");
+    GlobalParams::log_level = readParam<string>(config, "log_level", "OFF");
+    GlobalParams::log_file = readParam<string>(config, "log_file", "");
+    GlobalParams::log_to_stderr = readParam<bool>(config, "log_to_stderr", true);
+    GlobalParams::log_components = readParam<vector<string> >(config, "log_components", vector<string>());
+    GlobalParams::stats_format = normalizeStatsFormat(readParam<string>(config, "stats_format", "text").c_str());
+    GlobalParams::stats_file = readParam<string>(config, "stats_file", "");
     GlobalParams::trace_mode = readParam<bool>(config, "trace_mode");
     GlobalParams::trace_filename = readParam<string>(config, "trace_filename");
+    GlobalParams::trace_scope = normalizeTraceScope(readParam<string>(config, "trace_scope", "basic").c_str());
 
     GlobalParams::topology = readParam<string>(config, "topology", TOPOLOGY_MESH);
 
@@ -221,7 +312,13 @@ void showHelp(char selfname[])
          << "\t-config\t\t\tLoad the specified configuration file" << endl
          << "\t-power\t\t\tLoad the specified power configurations file" << endl
          << "\t-verbose N\t\tVerbosity level (1=low, 2=medium, 3=high)" << endl
+         << "\t-loglevel LEVEL\t\tRuntime log level (OFF, ERROR, WARN, INFO, DEBUG, TRACE)" << endl
+         << "\t-logfile FILE\t\tWrite runtime logs to FILE" << endl
+         << "\t-logcomp LIST\t\tComma-separated log components (router, hub, channel, tokenring, initiator)" << endl
+         << "\t-stats_format FORMAT\tWrite optional stats file as text, csv, or json" << endl
+         << "\t-stats_file FILE\tWrite optional stats export to FILE" << endl
          << "\t-trace FILENAME\t\tTrace signals to a VCD file named 'FILENAME.vcd'" << endl
+         << "\t-trace_scope SCOPE\tTrace scope: basic, router, buffers, wireless, all" << endl
          << "\t-dimx N\t\t\tSet the mesh X dimension" << endl
          << "\t-dimy N\t\t\tSet the mesh Y dimension" << endl
          << "\t-buffer N\t\tSet the depth of router input buffers [flits]" << endl
@@ -286,7 +383,14 @@ void showConfig()
 {
     cout << "Using the following configuration: " << endl
          << "- verbose_mode = " << GlobalParams::verbose_mode << endl
+         << "- log_level = " << GlobalParams::log_level << endl
+         << "- log_file = " << (GlobalParams::log_file.empty() ? string("<stderr-only>") : GlobalParams::log_file) << endl
+         << "- log_to_stderr = " << GlobalParams::log_to_stderr << endl
+         << "- log_components = " << (GlobalParams::log_components.empty() ? string("<all>") : joinStrings(GlobalParams::log_components, ",")) << endl
+         << "- stats_format = " << GlobalParams::stats_format << endl
+         << "- stats_file = " << (GlobalParams::stats_file.empty() ? string("<disabled>") : GlobalParams::stats_file) << endl
          << "- trace_mode = " << GlobalParams::trace_mode << endl
+         << "- trace_scope = " << GlobalParams::trace_scope << endl
       // << "- trace_filename = " << GlobalParams::trace_filename << endl
          << "- mesh_dim_x = " << GlobalParams::mesh_dim_x << endl
          << "- mesh_dim_y = " << GlobalParams::mesh_dim_y << endl
@@ -477,6 +581,16 @@ void checkConfiguration()
 	exit(1);
 #endif
     }
+
+    if (GlobalParams::stats_format != "text" &&
+        GlobalParams::stats_format != "csv" &&
+        GlobalParams::stats_format != "json")
+    {
+        cerr << "Error: stats_format must be one of: text, csv, json" << endl;
+        exit(1);
+    }
+
+    GlobalParams::trace_scope = normalizeTraceScope(GlobalParams::trace_scope.c_str());
 }
 
 void parseCmdLine(int arg_num, char *arg_vet[])
@@ -491,11 +605,23 @@ void parseCmdLine(int arg_num, char *arg_vet[])
 	{
 	    if (!strcmp(arg_vet[i], "-verbose"))
 		GlobalParams::verbose_mode = parseVerboseMode(requireOptionValue(i, arg_num, arg_vet, "-verbose"));
+	    else if (!strcmp(arg_vet[i], "-loglevel"))
+		GlobalParams::log_level = requireOptionValue(i, arg_num, arg_vet, "-loglevel");
+	    else if (!strcmp(arg_vet[i], "-logfile"))
+		GlobalParams::log_file = requireOptionValue(i, arg_num, arg_vet, "-logfile");
+	    else if (!strcmp(arg_vet[i], "-logcomp"))
+		GlobalParams::log_components = parseLogComponents(requireOptionValue(i, arg_num, arg_vet, "-logcomp"));
+	    else if (!strcmp(arg_vet[i], "-stats_format"))
+		GlobalParams::stats_format = normalizeStatsFormat(requireOptionValue(i, arg_num, arg_vet, "-stats_format"));
+	    else if (!strcmp(arg_vet[i], "-stats_file"))
+		GlobalParams::stats_file = requireOptionValue(i, arg_num, arg_vet, "-stats_file");
 	    else if (!strcmp(arg_vet[i], "-trace")) 
 	    {
 		GlobalParams::trace_mode = true;
 		GlobalParams::trace_filename = requireOptionValue(i, arg_num, arg_vet, "-trace");
 	    } 
+	    else if (!strcmp(arg_vet[i], "-trace_scope"))
+		GlobalParams::trace_scope = normalizeTraceScope(requireOptionValue(i, arg_num, arg_vet, "-trace_scope"));
 	    else if (!strcmp(arg_vet[i], "-dimx"))
 		GlobalParams::mesh_dim_x = atoi(requireOptionValue(i, arg_num, arg_vet, "-dimx"));
 	    else if (!strcmp(arg_vet[i], "-dimy"))
