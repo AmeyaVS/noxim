@@ -132,12 +132,28 @@ Noxim simulation completed. (1020 cycles executed)
 
 ### Other runtime outputs
 
-- `-verbose 1`, `2`, or `3` prints configuration details and increasingly detailed runtime logs
-- `-trace NAME` generates `NAME.vcd` with traced SystemC signals
+- `-verbose 1`, `2`, or `3` prints configuration details and affects some legacy flit-formatting paths
+- `-loglevel LEVEL` enables runtime diagnostics, with optional `-logfile FILE` and `-logcomp comp1,comp2`
+- `-stats_format text|csv|json -stats_file FILE` writes an additional end-of-run summary file without changing the normal console summary
+- `-trace NAME -trace_scope SCOPE` generates `NAME.vcd` with selectable trace coverage
 - `-detailed` adds per-communication statistics
 - `-show_buf_stats` prints buffer occupancy statistics
 - `-asciimonitor` enables an experimental textual network monitor
 - `SIGQUIT` prints current statistics without waiting for the run to end
+
+Typical debugging examples:
+
+```bash
+./noxim -config ../config_examples/default_config.yaml -loglevel DEBUG -logcomp router
+./noxim -config ../config_examples/default_config.yaml -stats_format csv -stats_file results.csv
+./noxim -config ../config_examples/default_config.yaml -trace debug_trace -trace_scope all
+```
+
+Practical note:
+
+- Runtime logging has low overhead when `log_level` is `OFF`, but `DEBUG` or `TRACE` can slow down runs if many messages are emitted
+- VCD tracing can slow simulations significantly, especially with `trace_scope: all`
+- The standard text summary on `stdout` is intentionally kept stable for tools such as `noxim_explorer`
 
 ### Configuration precedence
 
@@ -230,7 +246,7 @@ Supported MAC policies are:
 
 The current codebase is stable with `TOKEN_PACKET`. The hold-based policies are implemented, but in this repository state they still expose runtime assertions in some workloads, so they are not part of the green regression baseline.
 
-### 3.5 Simulation-control options
+### 3.5 Simulation-control, logging, stats-export, and trace options
 
 | YAML key | Meaning | CLI equivalent |
 | --- | --- | --- |
@@ -242,14 +258,26 @@ The current codebase is stable with `TOKEN_PACKET`. The hold-based policies are 
 | `max_volume_to_be_drained` | Stop condition based on delivered flits | `-volume N` |
 | `show_buffer_stats` | Print buffer occupancy stats | `-show_buf_stats` |
 | `verbose_mode` | Verbosity level | `-verbose 0..3` or `-verbose VERBOSE_*` |
+| `log_level` | Runtime logger level: `OFF`, `ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE` | `-loglevel LEVEL` |
+| `log_file` | Runtime log file path | `-logfile FILE` |
+| `log_to_stderr` | Also emit runtime logs to `stderr` | none |
+| `log_components` | Runtime log component filter list | `-logcomp a,b,c` |
+| `stats_format` | Optional stats-file format: `text`, `csv`, `json` | `-stats_format FORMAT` |
+| `stats_file` | Optional stats-file path | `-stats_file FILE` |
 | `trace_mode` | Enable VCD tracing | `-trace FILE` also sets `trace_filename` |
 | `trace_filename` | VCD base filename | `-trace FILE` |
+| `trace_scope` | VCD coverage selection: `basic`, `router`, `buffers`, `wireless`, `all` | `-trace_scope SCOPE` |
 | `rnd_generator_seed` | Random seed for deterministic runs | `-seed N` |
 
 Notes:
 
 - `clock_period_ps` affects clocking, wireless latency quantization, and the power model
+- `verbose_mode` is a legacy verbosity control; the main runtime diagnostics are now driven by `log_level`
+- `log_components` currently recognizes component groups such as `router`, `hub`, `channel`, `tokenring`, and `initiator`
+- `stats_file` writes an extra export file and does not replace the traditional text summary printed on `stdout`
 - `trace_mode` and `trace_filename` are usually controlled together through `-trace FILE`
+- `trace_scope: basic` traces clock/reset plus wired handshakes; broader scopes add flits, NoP, buffer-state, and wireless/token-ring signals
+- `trace_scope: all` is useful for debugging but can generate large VCD files and noticeably slow simulation
 - `rnd_generator_seed` is supported by the loader even though older example YAML files may omit it
 
 ### 3.6 Wireless feature toggles
@@ -661,6 +689,8 @@ other/noxim_explorer other/sim.cfg
 ```
 
 The explorer reads a configuration-space script and sweeps parameter combinations. It repeatedly launches `bin/noxim`, parses the summary metrics, and emits one MATLAB `.m` file per explored non-aggregated configuration.
+
+The new `stats_file` export is optional and separate; `noxim_explorer` still reads the standard text summary printed on `stdout`.
 
 ### 5.3 Explorer configuration-file format
 
