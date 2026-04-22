@@ -20,6 +20,11 @@ To receive information about new Noxim features, updates and events, please regi
 
 What's New ? 
 ------------
+**[April 2026]**
+
+  * Added a deterministic regression test suite with pinned YAML configurations and golden outputs
+  * Added `./regression.sh` for reproducible simulator verification across mesh and delta topologies
+
 **[March 2018]**
 
   * Support for virtual channels for improved traffic management
