@@ -110,7 +110,7 @@ void loadConfiguration() {
     GlobalParams::n_virtual_channels = readParam<int>(config, "n_virtual_channels");
     GlobalParams::reset_time = readParam<int>(config, "reset_time");
     GlobalParams::stats_warm_up_time = readParam<int>(config, "stats_warm_up_time");
-    GlobalParams::rnd_generator_seed = time(NULL);
+    GlobalParams::rnd_generator_seed = readParam<int>(config, "rnd_generator_seed", (int) time(NULL));
     GlobalParams::detailed = readParam<bool>(config, "detailed");
     GlobalParams::dyad_threshold = readParam<double>(config, "dyad_threshold");
     GlobalParams::max_volume_to_be_drained = readParam<unsigned int>(config, "max_volume_to_be_drained");

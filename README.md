@@ -60,6 +60,17 @@ and then build from the repository root with:
 
 This fixes the local dependencies under `bin/libs` and compiles `bin/noxim`.
 
+For deterministic regression checks from the repository root, run:
+
+    ./regression.sh
+
+This rebuilds the simulator, runs the curated regression suite under
+`other/regression/`, and compares the normalized simulator summaries with the
+committed golden outputs. To refresh those golden outputs after intentionally
+changing simulator behavior, use:
+
+    ./regression.sh --update
+
 If you already cloned the repository and want to populate the local dependencies expected by
 `bin/Makefile`, run:
 
