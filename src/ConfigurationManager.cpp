@@ -102,6 +102,7 @@ void loadConfiguration() {
     GlobalParams::selection_strategy = readParam<string>(config, "selection_strategy");
     GlobalParams::packet_injection_rate = readParam<double>(config, "packet_injection_rate");
     GlobalParams::probability_of_retransmission = readParam<double>(config, "probability_of_retransmission");
+    GlobalParams::locality = readParam<double>(config, "locality", 0.5);
     GlobalParams::traffic_distribution = readParam<string>(config, "traffic_distribution");
     GlobalParams::traffic_table_filename = readParam<string>(config, "traffic_table_filename");
     GlobalParams::traffic_hardcoded_filename = readParam<string>(config, "traffic_hardcoded_filename");

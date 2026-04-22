@@ -180,15 +180,14 @@ run_case() {
     actual_file="$ACTUAL_DIR/$id.txt"
     expected_file="$EXPECTED_DIR/$id.txt"
 
-    if [[ "$config_name" =~ mesh_([0-9]+)x([0-9]+)_buf[0-9]+ ]]; then
-        dim_x="${BASH_REMATCH[1]}"
-        dim_y="${BASH_REMATCH[2]}"
-    else
-        echo "Cannot infer dimensions from config name: $config_name" >&2
-        exit 1
-    fi
-
     if [[ "$routing" == "TABLE_BASED" ]]; then
+        if [[ "$config_name" =~ mesh_([0-9]+)x([0-9]+)_buf[0-9]+ ]]; then
+            dim_x="${BASH_REMATCH[1]}"
+            dim_y="${BASH_REMATCH[2]}"
+        else
+            echo "Cannot infer mesh dimensions for TABLE_BASED case: $config_name" >&2
+            exit 1
+        fi
         table_path="$TABLE_DIR/xy_${dim_x}x${dim_y}.rt"
         ensure_xy_routing_table "$dim_x" "$dim_y" "$table_path"
         cmd+=(-routing "$routing" "$table_path")
