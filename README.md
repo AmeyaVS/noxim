@@ -25,6 +25,7 @@ What's New ?
   * Added a deterministic regression test suite with pinned YAML configurations and golden outputs
   * Added `./regression.sh` for reproducible simulator verification across mesh and delta topologies
   * Added the [Noxim User Guide in Markdown](doc/Noxim_User_Guide.md) and [PDF](doc/Noxim_User_Guide.pdf)
+  * Happy birthday to Noxim co-author 0xff!
 
 **[March 2018]**
 
