@@ -63,6 +63,9 @@ SC_MODULE(Router)
     int routing_type;		                // Type of routing algorithm
     int selection_type;
     BufferBank buffer[DIRECTIONS + 2];		// buffer[direction][virtual_channel] 
+    sc_signal<int> traced_buffer_occupancy[DIRECTIONS + 2][MAX_VIRTUAL_CHANNELS];
+    sc_signal<Flit> **traced_buffer_slots[DIRECTIONS + 2];
+    int traced_buffer_depth;
     bool current_level_rx[DIRECTIONS + 2];	// Current level for Alternating Bit Protocol (ABP)
     bool current_level_tx[DIRECTIONS + 2];	// Current level for Alternating Bit Protocol (ABP)
     Stats stats;		                // Statistics
@@ -79,6 +82,7 @@ SC_MODULE(Router)
     void rxProcess();		// The receiving process
     void txProcess();		// The transmitting process
     void perCycleUpdate();
+    void updateBufferTraceSignals(bool reset_snapshot);
     void configure(const int _id, const double _warm_up_time,
 		   const unsigned int _max_buffer_size,
 		   GlobalRoutingTable & grt);
@@ -88,6 +92,13 @@ SC_MODULE(Router)
     // Constructor
 
     SC_CTOR(Router) {
+        traced_buffer_depth = GlobalParams::buffer_depth;
+        for (int direction = 0; direction < DIRECTIONS + 2; direction++) {
+            traced_buffer_slots[direction] = new sc_signal<Flit>*[MAX_VIRTUAL_CHANNELS];
+            for (int vc = 0; vc < MAX_VIRTUAL_CHANNELS; vc++)
+                traced_buffer_slots[direction][vc] = new sc_signal<Flit>[traced_buffer_depth];
+        }
+
         SC_METHOD(process);
         sensitive << reset;
         sensitive << clock.pos();
@@ -139,6 +150,18 @@ SC_MODULE(Router)
 
     bool inCongestion();
     void ShowBuffersStats(std::ostream & out);
+
+    const sc_signal<int> &getTracedBufferOccupancy(int direction, int vc) const {
+        return traced_buffer_occupancy[direction][vc];
+    }
+
+    const sc_signal<Flit> &getTracedBufferSlot(int direction, int vc, int slot) const {
+        return traced_buffer_slots[direction][vc][slot];
+    }
+
+    int getTracedBufferDepth() const {
+        return traced_buffer_depth;
+    }
 
     bool connectedHubs(int src_hub, int dst_hub);
 };

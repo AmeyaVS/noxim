@@ -124,6 +124,22 @@ string matrixLabel(const string &prefix, int x, int y)
     return out.str();
 }
 
+string directionLabel(int direction)
+{
+    switch (direction) {
+    case DIRECTION_NORTH:
+        return "north";
+    case DIRECTION_EAST:
+        return "east";
+    case DIRECTION_SOUTH:
+        return "south";
+    case DIRECTION_WEST:
+        return "west";
+    default:
+        return "unknown";
+    }
+}
+
 string indexedLabel(const string &prefix, int index)
 {
     ostringstream out;
@@ -157,6 +173,32 @@ void traceBufferSignals(sc_trace_file *tf, NoC *noc, int dim_x, int dim_y)
         for (int j = 0; j < dim_y; j++) {
             traceCardinalSignals(tf, noc->buffer_full_status[i][j], matrixLabel("buffer_full_status", i, j));
             traceCardinalSignals(tf, noc->free_slots[i][j], matrixLabel("free_slots", i, j));
+        }
+    }
+
+    if (GlobalParams::topology != TOPOLOGY_MESH)
+        return;
+
+    for (int i = 0; i < GlobalParams::mesh_dim_x; i++) {
+        for (int j = 0; j < GlobalParams::mesh_dim_y; j++) {
+            Router *router = noc->t[i][j]->r;
+            const string prefix = matrixLabel("router_buffer", i, j);
+
+            for (int direction = 0; direction < DIRECTIONS; direction++) {
+                const string direction_prefix = prefix + "." + directionLabel(direction);
+                for (int vc = 0; vc < GlobalParams::n_virtual_channels; vc++) {
+                    const string vc_prefix = direction_prefix + ".vc" + to_string(vc);
+                    traceNamed(tf,
+                               router->getTracedBufferOccupancy(direction, vc),
+                               vc_prefix + ".occupancy");
+
+                    for (int slot = 0; slot < router->getTracedBufferDepth(); slot++) {
+                        traceNamed(tf,
+                                   router->getTracedBufferSlot(direction, vc, slot),
+                                   vc_prefix + ".slot" + to_string(slot));
+                    }
+                }
+            }
         }
     }
 }

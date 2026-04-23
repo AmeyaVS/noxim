@@ -26,7 +26,12 @@ What's New ?
   * Added `./regression.sh` for reproducible simulator verification across mesh and delta topologies
   * Added the [Noxim User Guide in Markdown](doc/Noxim_User_Guide.md) and [PDF](doc/Noxim_User_Guide.pdf)
   * Added runtime logging, optional text/CSV/JSON stats export, and scoped VCD tracing for easier debugging
+  * Added `./visualize.sh` and `other/noxim_trace_viewer.py` for a cycle-by-cycle mesh visualizer with router-buffer and link-flit inspection
   * Happy birthday to Noxim co-author 0xff!
+
+<a href="doc/images/noxim-mesh-trace-viewer.png">
+  <img src="doc/images/noxim-mesh-trace-viewer.png" width="460" alt="Noxim mesh trace viewer screenshot">
+</a>
 
 **[March 2018]**
 
@@ -78,6 +83,18 @@ committed golden outputs. To refresh those golden outputs after intentionally
 changing simulator behavior, use:
 
     ./regression.sh --update
+
+For post-simulation inspection of buffers, flits, handshakes, and wireless/token
+state cycle by cycle, run:
+
+    ./visualize.sh -sim 40 -warmup 0 -seed 0 -pir 0.3 poisson
+
+This produces a self-contained HTML viewer under `other/visualizer-output/`.
+The wrapper uses scoped VCD tracing internally and has no dependency beyond
+Python 3 and a browser. If you already have a VCD trace, you can convert it
+directly with:
+
+    python3 other/noxim_trace_viewer.py --vcd path/to/trace.vcd --output path/to/trace.html --config config_examples/default_config.yaml
 
 If you already cloned the repository and want to populate the local dependencies expected by
 `bin/Makefile`, run:

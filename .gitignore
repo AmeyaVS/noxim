@@ -1,5 +1,7 @@
 .idea/
+other/__pycache__/
 bin/build/
 bin/libs/
 bin/noxim
 other/regression/generated/
+other/visualizer-output/

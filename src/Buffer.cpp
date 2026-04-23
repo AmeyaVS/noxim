@@ -204,6 +204,19 @@ Flit Buffer::Front() const
   return f;
 }
 
+Flit Buffer::Peek(unsigned int index) const
+{
+  assert(index < buffer.size());
+
+  queue<Flit> snapshot = buffer;
+  while (index > 0) {
+    snapshot.pop();
+    index--;
+  }
+
+  return snapshot.front();
+}
+
 unsigned int Buffer::Size() const
 {
   return buffer.size();

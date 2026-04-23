@@ -136,6 +136,7 @@ Noxim simulation completed. (1020 cycles executed)
 - `-loglevel LEVEL` enables runtime diagnostics, with optional `-logfile FILE` and `-logcomp comp1,comp2`
 - `-stats_format text|csv|json -stats_file FILE` writes an additional end-of-run summary file without changing the normal console summary
 - `-trace NAME -trace_scope SCOPE` generates `NAME.vcd` with selectable trace coverage
+- `./visualize.sh ...` runs a traced simulation and converts it into a local HTML step-by-step viewer
 - `-detailed` adds per-communication statistics
 - `-show_buf_stats` prints buffer occupancy statistics
 - `-asciimonitor` enables an experimental textual network monitor
@@ -147,12 +148,14 @@ Typical debugging examples:
 ./noxim -config ../config_examples/default_config.yaml -loglevel DEBUG -logcomp router
 ./noxim -config ../config_examples/default_config.yaml -stats_format csv -stats_file results.csv
 ./noxim -config ../config_examples/default_config.yaml -trace debug_trace -trace_scope all
+./visualize.sh -sim 40 -warmup 0 -seed 0 -pir 0.3 poisson
 ```
 
 Practical note:
 
 - Runtime logging has low overhead when `log_level` is `OFF`, but `DEBUG` or `TRACE` can slow down runs if many messages are emitted
 - VCD tracing can slow simulations significantly, especially with `trace_scope: all`
+- `./visualize.sh` is intended for short or medium debug runs, not long performance campaigns
 - The standard text summary on `stdout` is intentionally kept stable for tools such as `noxim_explorer`
 
 ### Configuration precedence
@@ -640,7 +643,7 @@ For a packet that uses wireless:
 - Wireless transmission delay is quantized in cycles from `flit_size / data_rate`
 - Output metrics are printed in cycles and joules
 
-## 5. Other Tools: Regression Tests, Noxim Explorer, and the Produced Matlab Files
+## 5. Other Tools: Regression Tests, Trace Viewer, Noxim Explorer, and the Produced Matlab Files
 
 ### 5.1 Regression tests
 
@@ -674,7 +677,55 @@ What the harness does:
 3. Normalizes the stable summary section of the simulator output
 4. Compares it against committed baselines, or refreshes them with `--update`
 
-### 5.2 `noxim_explorer`
+### 5.2 Trace viewer
+
+The easiest way to inspect the network state cycle by cycle after a run is:
+
+```bash
+./visualize.sh -sim 40 -warmup 0 -seed 0 -pir 0.3 poisson
+```
+
+What it does:
+
+1. Builds `bin/noxim` if needed
+2. Runs the simulator with `-trace` and `-trace_scope all` unless you override them
+3. Converts the resulting VCD file into a self-contained HTML file
+
+The generated files go by default under:
+
+- `other/visualizer-output/noxim_trace.vcd`
+- `other/visualizer-output/noxim_trace.html`
+
+The HTML viewer is intentionally lightweight:
+
+- Pure Python 3 stdlib on the conversion side
+- No external JavaScript libraries
+- Works directly from a local `file://` path in a browser
+
+Viewer features:
+
+- previous / next cycle navigation
+- cycle slider
+- go-to-cycle input
+- topology-aware network rendering for mesh and delta runs
+- per-node inspection of handshakes, flits, NoP data, buffer-full state, and free slots
+- wireless/token-ring panels when the trace includes WiNoC signals
+
+You can also convert an existing VCD without rerunning the simulation:
+
+```bash
+python3 other/noxim_trace_viewer.py \
+  --vcd other/visualizer-output/noxim_trace.vcd \
+  --output other/visualizer-output/noxim_trace.html \
+  --config config_examples/default_config.yaml
+```
+
+Practical note:
+
+- this tool is built on top of VCD tracing, so its runtime overhead is the same order as `-trace_scope all`
+- it is best used for debug runs with limited simulation length
+
+### 5.3 `noxim_explorer`
 
 Build it with:
 
@@ -692,7 +743,7 @@ The explorer reads a configuration-space script and sweeps parameter combination
 
 The new `stats_file` export is optional and separate; `noxim_explorer` still reads the standard text summary printed on `stdout`.
 
-### 5.3 Explorer configuration-file format
+### 5.4 Explorer configuration-file format
 
 Explorer scripts use bracketed sections:
 
@@ -750,7 +801,7 @@ Explorer-specific parameter names:
 - `dtiles`: delta-topology endpoint count
 - Regular keys like `routing`, `pir`, `buffer`, and `size` map directly to CLI flags
 
-### 5.4 MATLAB files produced by `noxim_explorer`
+### 5.5 MATLAB files produced by `noxim_explorer`
 
 For each explored configuration, `noxim_explorer` emits an `.m` file whose name is derived from the selected parameter combination.
 
@@ -778,14 +829,15 @@ Each generated file contains:
 
 The explorer expects to parse the standard Noxim summary labels exactly, so changes to the console output format can affect it.
 
-### 5.5 Explorer repetitions and confidence intervals
+### 5.6 Explorer repetitions and confidence intervals
 
 For each aggregated point, the explorer runs the simulator multiple times, computes the mean, and uses a `ttest`-based confidence interval before generating the summarized MATLAB arrays. The default repetition count is `5`, but `other/sim.cfg` sets it to `10`.
 
-### 5.6 Related helper tools in `other/`
+### 5.7 Related helper tools in `other/`
 
 Besides `noxim_explorer`, the `other/` directory includes tools that are often useful when building workflows around Noxim:
 
+- `noxim_trace_viewer.py`: converts a VCD trace into a local HTML cycle viewer
 - `apsra2noxim`: extracts communication and routing tables from APSRA output
 - `hotspot_ttable`: builds hotspot-oriented traffic tables
 - `distancebased_ttable`: builds traffic tables with short/long-range mixes
@@ -798,7 +850,8 @@ For day-to-day use, the recommended loop is:
 
 1. Build with `./build.sh`
 2. Run experiments with a YAML config plus a small number of CLI overrides
-3. Use `./regression.sh` to detect unintended functional changes
-4. Use `other/noxim_explorer` when you need automated sweeps and MATLAB-ready output
+3. Use `./visualize.sh` for short cycle-by-cycle debug sessions
+4. Use `./regression.sh` to detect unintended functional changes
+5. Use `other/noxim_explorer` when you need automated sweeps and MATLAB-ready output
 
 For deterministic runs, always set `rnd_generator_seed` in YAML or pass `-seed N` on the command line.

@@ -292,11 +292,32 @@ NoP_data Router::getCurrentNoPData()
     return NoP_data;
 }
 
+void Router::updateBufferTraceSignals(bool reset_snapshot)
+{
+    Flit empty_flit = {};
+    empty_flit.hub_relay_node = NOT_VALID;
+
+    for (int direction = 0; direction < DIRECTIONS; direction++) {
+        for (int vc = 0; vc < GlobalParams::n_virtual_channels; vc++) {
+            const unsigned int occupancy = reset_snapshot ? 0 : buffer[direction][vc].Size();
+            traced_buffer_occupancy[direction][vc].write((int) occupancy);
+
+            for (int slot = 0; slot < traced_buffer_depth; slot++) {
+                if (!reset_snapshot && slot < (int) occupancy)
+                    traced_buffer_slots[direction][vc][slot].write(buffer[direction][vc].Peek(slot));
+                else
+                    traced_buffer_slots[direction][vc][slot].write(empty_flit);
+            }
+        }
+    }
+}
+
 void Router::perCycleUpdate()
 {
     if (reset.read()) {
 	for (int i = 0; i < DIRECTIONS + 1; i++)
 	    free_slots[i].write(buffer[i][DEFAULT_VC].GetMaxBufferSize());
+        updateBufferTraceSignals(true);
     } else {
         selectionStrategy->perCycleUpdate(this);
 
@@ -311,6 +332,7 @@ void Router::perCycleUpdate()
 	}
 
 	power.leakageLinkRouter2Hub();
+        updateBufferTraceSignals(false);
     }
 }
 
