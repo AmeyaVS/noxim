@@ -10,6 +10,7 @@ TRACE_BASE="$DEFAULT_TRACE_BASE"
 TRACE_SCOPE="router,buffers"
 CONFIG_FILE=""
 POWER_FILE=""
+TOPOLOGY_OVERRIDE=""
 AUTO_OPEN=1
 USER_SET_TRACE=0
 USER_SET_SCOPE=0
@@ -20,10 +21,12 @@ declare -a NOXIM_ARGS=()
 
 usage() {
   cat <<'EOF'
-Usage: ./visualize.sh [NOXIM OPTIONS]
+Usage: ./visualNoxim [NOXIM OPTIONS]
 
-Run a traced Noxim simulation and convert the resulting VCD trace into a
+Run a traced Noxim mesh simulation and convert the resulting VCD trace into a
 self-contained HTML viewer.
+
+All standard Noxim options are forwarded to `bin/noxim`.
 
 Defaults:
   -config      config_examples/default_config.yaml
@@ -32,11 +35,14 @@ Defaults:
   -trace_scope router,buffers
   auto-open    enabled when a desktop opener is available
 
+Constraints:
+  - visualNoxim currently supports only MESH topology
+
 Examples:
-  ./visualize.sh -sim 40 -warmup 0 -seed 0 -pir 0.3 poisson
-  ./visualize.sh -config config_examples/multi_channel.yaml -sim 20 -seed 0
-  ./visualize.sh -trace /tmp/my_run -trace_scope router,buffers -sim 30
-  ./visualize.sh --no-open -sim 20 -seed 0
+  ./visualNoxim -sim 40 -warmup 0 -seed 0 -pir 0.3 poisson
+  ./visualNoxim -config config_examples/default_config.yaml -sim 20 -seed 0
+  ./visualNoxim -trace /tmp/my_run -trace_scope router,buffers -sim 30
+  ./visualNoxim --no-open -sim 20 -seed 0
 EOF
 }
 
@@ -54,10 +60,39 @@ require_value() {
   local option="$1"
 
   if (($# == 1)); then
-    echo "[visualize] Error: missing value for $option" >&2
+    echo "[visualNoxim] Error: missing value for $option" >&2
     usage >&2
     exit 1
   fi
+}
+
+read_config_topology() {
+  local config_path="$1"
+
+  python3 - "$config_path" <<'PY'
+from pathlib import Path
+import sys
+
+topology = "MESH"
+config_path = Path(sys.argv[1])
+
+try:
+    for raw_line in config_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.split("#", 1)[0].strip()
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        if key.strip() != "topology":
+            continue
+        value = value.strip().strip('"').strip("'")
+        if value:
+            topology = value.upper()
+        break
+except FileNotFoundError:
+    pass
+
+print(topology)
+PY
 }
 
 open_viewer() {
@@ -79,7 +114,7 @@ open_viewer() {
     fi
   fi
 
-  echo "[visualize] Warning: could not auto-open viewer, open it manually: $html_file" >&2
+  echo "[visualNoxim] Warning: could not auto-open viewer, open it manually: $html_file" >&2
   return 0
 }
 
@@ -122,6 +157,12 @@ while (($#)); do
       NOXIM_ARGS+=("$1" "$2")
       shift 2
       ;;
+    -topology)
+      require_value "$1" "$@"
+      TOPOLOGY_OVERRIDE="$(printf '%s' "$2" | tr '[:lower:]' '[:upper:]')"
+      NOXIM_ARGS+=("$1" "$2")
+      shift 2
+      ;;
     *)
       NOXIM_ARGS+=("$1")
       shift
@@ -130,11 +171,6 @@ while (($#)); do
 done
 
 mkdir -p "$OUTPUT_DIR"
-
-if [[ ! -x "$ROOT_DIR/bin/noxim" ]]; then
-  echo "[visualize] bin/noxim not found, building it first"
-  "$ROOT_DIR/build.sh"
-fi
 
 if (( USER_SET_CONFIG == 0 )); then
   CONFIG_FILE="$ROOT_DIR/config_examples/default_config.yaml"
@@ -146,6 +182,23 @@ if (( USER_SET_POWER == 0 )); then
   NOXIM_ARGS+=("-power" "$POWER_FILE")
 fi
 
+EFFECTIVE_TOPOLOGY="$TOPOLOGY_OVERRIDE"
+if [[ -z "$EFFECTIVE_TOPOLOGY" ]]; then
+  EFFECTIVE_TOPOLOGY="$(read_config_topology "$CONFIG_FILE")"
+fi
+
+if [[ "$EFFECTIVE_TOPOLOGY" != "MESH" ]]; then
+  echo "[visualNoxim] Error: visualNoxim currently supports only MESH topology." >&2
+  echo "[visualNoxim] Requested topology: $EFFECTIVE_TOPOLOGY" >&2
+  echo "[visualNoxim] Use a mesh configuration, or run bin/noxim directly with -trace for non-mesh debugging." >&2
+  exit 1
+fi
+
+if [[ ! -x "$ROOT_DIR/bin/noxim" ]]; then
+  echo "[visualNoxim] bin/noxim not found, building it first"
+  "$ROOT_DIR/build.sh"
+fi
+
 if (( USER_SET_TRACE == 0 )); then
   NOXIM_ARGS+=("-trace" "$TRACE_BASE")
 fi
@@ -154,7 +207,7 @@ if (( USER_SET_SCOPE == 0 )); then
   NOXIM_ARGS+=("-trace_scope" "$TRACE_SCOPE")
 fi
 
-echo "[visualize] Running traced simulation"
+echo "[visualNoxim] Running traced simulation"
 cd "$ROOT_DIR"
 "$ROOT_DIR/bin/noxim" "${NOXIM_ARGS[@]}"
 
@@ -162,15 +215,15 @@ VCD_FILE="${TRACE_BASE}.vcd"
 HTML_FILE="${TRACE_BASE}.html"
 
 if [[ ! -f "$VCD_FILE" ]]; then
-  echo "[visualize] Error: expected trace file $VCD_FILE was not produced" >&2
+  echo "[visualNoxim] Error: expected trace file $VCD_FILE was not produced" >&2
   exit 1
 fi
 
-echo "[visualize] Building HTML viewer"
+echo "[visualNoxim] Building HTML viewer"
 python3 "$ROOT_DIR/other/noxim_trace_viewer.py" \
   --vcd "$VCD_FILE" \
   --output "$HTML_FILE" \
   --config "$CONFIG_FILE"
 
-echo "[visualize] Viewer ready: $HTML_FILE"
+echo "[visualNoxim] Viewer ready: $HTML_FILE"
 open_viewer "$HTML_FILE"

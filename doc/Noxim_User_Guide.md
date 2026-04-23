@@ -136,7 +136,7 @@ Noxim simulation completed. (1020 cycles executed)
 - `-loglevel LEVEL` enables runtime diagnostics, with optional `-logfile FILE` and `-logcomp comp1,comp2`
 - `-stats_format text|csv|json -stats_file FILE` writes an additional end-of-run summary file without changing the normal console summary
 - `-trace NAME -trace_scope SCOPE` generates `NAME.vcd` with selectable trace coverage
-- `./visualize.sh ...` runs a traced simulation and converts it into a local HTML step-by-step viewer
+- `./visualNoxim ...` runs a traced mesh simulation and converts it into a local HTML step-by-step viewer
 - `-detailed` adds per-communication statistics
 - `-show_buf_stats` prints buffer occupancy statistics
 - `-asciimonitor` enables an experimental textual network monitor
@@ -148,14 +148,14 @@ Typical debugging examples:
 ./noxim -config ../config_examples/default_config.yaml -loglevel DEBUG -logcomp router
 ./noxim -config ../config_examples/default_config.yaml -stats_format csv -stats_file results.csv
 ./noxim -config ../config_examples/default_config.yaml -trace debug_trace -trace_scope all
-./visualize.sh -sim 40 -warmup 0 -seed 0 -pir 0.3 poisson
+./visualNoxim -sim 40 -warmup 0 -seed 0 -pir 0.3 poisson
 ```
 
 Practical note:
 
 - Runtime logging has low overhead when `log_level` is `OFF`, but `DEBUG` or `TRACE` can slow down runs if many messages are emitted
 - VCD tracing can slow simulations significantly, especially with `trace_scope: all`
-- `./visualize.sh` is intended for short or medium debug runs, not long performance campaigns
+- `./visualNoxim` is intended for short or medium debug runs, not long performance campaigns
 - The standard text summary on `stdout` is intentionally kept stable for tools such as `noxim_explorer`
 
 ### Configuration precedence
@@ -679,17 +679,21 @@ What the harness does:
 
 ### 5.2 Trace viewer
 
-The easiest way to inspect the network state cycle by cycle after a run is:
+The easiest way to inspect mesh network state cycle by cycle after a run is:
 
 ```bash
-./visualize.sh -sim 40 -warmup 0 -seed 0 -pir 0.3 poisson
+./visualNoxim -sim 40 -warmup 0 -seed 0 -pir 0.3 poisson
 ```
 
 What it does:
 
 1. Builds `bin/noxim` if needed
-2. Runs the simulator with `-trace` and `-trace_scope all` unless you override them
+2. Runs the simulator with `-trace` and `-trace_scope router,buffers` unless you override them
 3. Converts the resulting VCD file into a self-contained HTML file
+
+Current limitation:
+
+- `visualNoxim` supports `MESH` topology only and fails early for non-mesh configs
 
 The generated files go by default under:
 
@@ -707,9 +711,10 @@ Viewer features:
 - previous / next cycle navigation
 - cycle slider
 - go-to-cycle input
-- topology-aware network rendering for mesh and delta runs
-- per-node inspection of handshakes, flits, NoP data, buffer-full state, and free slots
-- wireless/token-ring panels when the trace includes WiNoC signals
+- reset-start and post-reset jump controls
+- mesh-grid rendering with directional north/west/east/south placement
+- per-tile inspection of directional buffers and in-flight link flits
+- selection persists while you move across cycles
 
 You can also convert an existing VCD without rerunning the simulation:
 
@@ -722,7 +727,7 @@ python3 other/noxim_trace_viewer.py \
 
 Practical note:
 
-- this tool is built on top of VCD tracing, so its runtime overhead is the same order as `-trace_scope all`
+- this tool is built on top of VCD tracing, so its runtime overhead is tied to the selected trace scope
 - it is best used for debug runs with limited simulation length
 
 ### 5.3 `noxim_explorer`
@@ -850,7 +855,7 @@ For day-to-day use, the recommended loop is:
 
 1. Build with `./build.sh`
 2. Run experiments with a YAML config plus a small number of CLI overrides
-3. Use `./visualize.sh` for short cycle-by-cycle debug sessions
+3. Use `./visualNoxim` for short cycle-by-cycle mesh debug sessions
 4. Use `./regression.sh` to detect unintended functional changes
 5. Use `other/noxim_explorer` when you need automated sweeps and MATLAB-ready output
 
