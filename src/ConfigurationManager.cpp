@@ -734,7 +734,9 @@ void parseCmdLine(int arg_num, char *arg_vet[])
 		} else if (!strcmp(traffic, "local")) {
 		    GlobalParams::traffic_distribution = TRAFFIC_LOCAL;
 		    GlobalParams::locality = atof(requireOptionValue(i, arg_num, arg_vet, "-traffic"));
-		}
+		} else if (!strcmp(traffic, "hotspot")) {
+    GlobalParams::traffic_distribution = TRAFFIC_HOTSPOT;
+}
 		else assert(false);
 	    } 
 	    else if (!strcmp(arg_vet[i], "-hs")) 
