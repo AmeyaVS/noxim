@@ -186,7 +186,7 @@ probability_of_retransmission: 0.01
 #   TRAFFIC_SHUFFLE
 #   TRAFFIC_BUTTERFLY
 #   TRAFFIC_HARDCODED
-traffic_distribution: TRAFFIC_RANDOM
+traffic_distribution: TRAFFIC_HOTSPOT
 # when traffic table based is specified, use the following
 # configuration file
 traffic_table_filename: "t.txt"
@@ -194,5 +194,5 @@ traffic_table_filename: "t.txt"
 # configuration file
 traffic_hardcoded_filename: "t.txt"
 # Hotspot traffic example
-# Run with: ./bin/noxim -config config_examples/default_config_hotspot.yaml -power bin/power.yaml
+# Run with: ./bin/noxim -config config_examples/default_config_hotspot.yaml -traffic hotspot -hs 5 0.2 -power bin/power.yaml
 # Node 5 receives 20% of extra traffic
