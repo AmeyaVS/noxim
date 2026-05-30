@@ -364,7 +364,7 @@ void showHelp(char selfname[])
          << "\t\tshuffle\t\tShuffle traffic distribution" << endl
          << "\t\thotspot\t\tHotspot traffic distribution" << endl
          <<	"\t\ttable FILENAME\tTraffic Table Based traffic distribution with table in the specified file" << endl
-         << "\t-hs ID P\t\tAdd node ID to hotspot nodes, with percentage P (0..1) (Only for 'random' traffic)" << endl
+         << "\t-hs ID P\t\tAdd node ID to hotspot nodes, with percentage P (0..1) (Only for 'random'/'hotspot' traffic)" << endl
          << "\t-warmup N\t\tStart to collect statistics after N cycles" << endl
          << "\t-seed N\t\t\tSet the seed of the random generator (default time())" << endl
          << "\t-detailed\t\tShow detailed statistics" << endl
