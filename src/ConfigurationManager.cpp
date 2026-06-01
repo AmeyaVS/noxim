@@ -362,8 +362,9 @@ void showHelp(char selfname[])
          << "\t\tbitreversal\tBit-reversal traffic distribution" << endl
          << "\t\tbutterfly\tButterfly traffic distribution" << endl
          << "\t\tshuffle\t\tShuffle traffic distribution" << endl
+         << "\t\thotspot\t\tHotspot traffic distribution" << endl
          <<	"\t\ttable FILENAME\tTraffic Table Based traffic distribution with table in the specified file" << endl
-         << "\t-hs ID P\t\tAdd node ID to hotspot nodes, with percentage P (0..1) (Only for 'random' traffic)" << endl
+         << "\t-hs ID P\t\tAdd node ID to hotspot nodes, with percentage P (0..1) (Only for 'random'/'hotspot' traffic)" << endl
          << "\t-warmup N\t\tStart to collect statistics after N cycles" << endl
          << "\t-seed N\t\t\tSet the seed of the random generator (default time())" << endl
          << "\t-detailed\t\tShow detailed statistics" << endl
@@ -734,7 +735,9 @@ void parseCmdLine(int arg_num, char *arg_vet[])
 		} else if (!strcmp(traffic, "local")) {
 		    GlobalParams::traffic_distribution = TRAFFIC_LOCAL;
 		    GlobalParams::locality = atof(requireOptionValue(i, arg_num, arg_vet, "-traffic"));
-		}
+		} else if (!strcmp(traffic, "hotspot")) {
+    GlobalParams::traffic_distribution = TRAFFIC_HOTSPOT;
+}
 		else assert(false);
 	    } 
 	    else if (!strcmp(arg_vet[i], "-hs")) 

@@ -161,6 +161,8 @@ bool ProcessingElement::canShot(Packet & packet)
 		    packet = trafficLocal();
         else if (GlobalParams::traffic_distribution == TRAFFIC_ULOCAL)
 		    packet = trafficULocal();
+         else if (GlobalParams::traffic_distribution == TRAFFIC_HOTSPOT)
+                    packet = trafficRandom();
         else {
             cout << "Invalid traffic distribution: " << GlobalParams::traffic_distribution << endl;
             exit(-1);
